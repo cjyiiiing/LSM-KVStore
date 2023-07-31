@@ -119,9 +119,8 @@ std::string KVStore::Get(uint64_t key) {
 
     // 3、查immutable_table_
     if (immutable_table_ != nullptr) {
-        // 增加引用计数，避免被析构         // TODO:为啥
-        // auto ptr = immutable_table_;
-        // val = ptr->Get(key);        // TODO:不需要加互斥锁吗
+        // 增加引用计数，避免被析构
+        auto ptr = immutable_table_;
         val = immutable_table_->Get(key);
         if (!val.empty()) {
             if (val == options::kDelSign) {
@@ -130,6 +129,8 @@ std::string KVStore::Get(uint64_t key) {
                 return val;
             }
         }
+
+        ptr.reset();
 
         while (kvstore_mode_ == compact) {
             std::unique_lock<std::mutex> lk(mutex_);
