@@ -91,7 +91,7 @@ private:
     std::vector<int> level_num_vec_;    // 记录每一层的文件数目
     std::vector<std::set<TableCache>> sstable_meta_info_;   // 记录所有SSTable文件的元信息
     mode kvstore_mode_; // 存储引擎工作模式
-    ThreadPool pool_{4};    // 线程池
+    ThreadPool pool_{4};    // 线程池，处理器内核总数为4，线程数量设置为4
     cache_t<uint64_t, std::string> cache_;  // 缓存器
 
     // 同步与互斥相关

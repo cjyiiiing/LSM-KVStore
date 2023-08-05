@@ -19,6 +19,10 @@
 class ThreadPool {
 public:
     explicit ThreadPool(std::size_t);
+    ThreadPool(const ThreadPool &) = delete;
+    ThreadPool(ThreadPool &&) = delete;
+    ThreadPool &operator=(const ThreadPool &) = delete;
+    ThreadPool &operator=(ThreadPool &&) = delete;
     ~ThreadPool();
 
     template <class F, class... Args> // 参照std::thread的初始化构造函数https://www.runoob.com/w3cnote/cpp-std-thread.html
