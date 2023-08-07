@@ -76,11 +76,10 @@ void KVStore::Put(uint64_t key, const std::string &val, bool to_cache) {
 
     // 如果mem_table_满了，转换为immutable_table_并创建线程写入磁盘
     if (mem_table_->memory_ > options::kMemTable) {
-        std::unique_lock<std::mutex> lk(mutex_);
         // 如果immutable_table_非空，先等它写入到level0
         if (immutable_table_ != nullptr) {
-            // std::unique_lock<std::mutex> lk(mutex_);
-            cond_var_.wait(lk, [&]{ return kvstore_mode_ == normal; });
+            std::unique_lock<std::mutex> lk(mutex_);
+            cond_var_.wait(lk, [&] { return immutable_table_ == nullptr; });
         }
 
         immutable_table_ = mem_table_;

@@ -10,6 +10,7 @@ namespace caches {
 
 /**
  * @brief LRU缓存策略，最近最久未使用的先淘汰
+ * @note 需要在内存中维护一个所有页面的链表，并且在每次访问内存时都必须要更新整个链表，开销较大
 */
 template <typename Key>
 class LRUCachePolicy : public ICachePolicy<Key> {
