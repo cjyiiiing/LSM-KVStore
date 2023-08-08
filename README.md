@@ -107,3 +107,5 @@ doxygen Doxygen.config
     - https://github.com/leiyx/My_LSM_KVStore
 - Google C++ style: https://google.github.io/styleguide/cppguide.html
 - 自动生成C++ UML图：https://blog.csdn.net/Cross_Entropy/article/details/117265884
+- 线程池：https://zhuanlan.zhihu.com/p/367309864
+- C++并发编程：https://paul.pub/cpp-concurrency/
