@@ -17,7 +17,7 @@ inline int GetFileNum(const std::string file_name) {
  * 将dir目录下的所有SST文件的元信息缓存到sstable_meta_info_中
  * 记录level_num_vec_
  */
-KVStore::KVStore(const std::string &dir) : KVStoreAPI(dir), cache_(options::kCacheCap) {
+KVStore::KVStore(const std::string& dir) : KVStoreAPI(dir), cache_(options::kCacheCap) {
     mem_table_ = std::make_shared<SkipList>();
     dir_ = dir;
     kvstore_mode_ = normal;
@@ -34,7 +34,8 @@ KVStore::KVStore(const std::string &dir) : KVStoreAPI(dir), cache_(options::kCac
         // 填充level_num_vec_
         if (file_num > 0) {
             level_num_vec_.emplace_back(GetFileNum(files.back()));
-        } else {
+        }
+        else {
             level_num_vec_.emplace_back(0);
         }
         // 填充sstable_meta_info_
@@ -55,7 +56,7 @@ KVStore::KVStore(const std::string &dir) : KVStoreAPI(dir), cache_(options::kCac
 */
 KVStore::~KVStore() {
     std::unique_lock<std::mutex> lock(mutex_);
-    cond_var_.wait(lock, [&]{ return kvstore_mode_ == normal; });
+    cond_var_.wait(lock, [&] { return kvstore_mode_ == normal; });
     kvstore_mode_ = exits;
     std::string path = dir_ + "/level0";
     mem_table_->Store(++level_num_vec_[0], path);
@@ -64,13 +65,14 @@ KVStore::~KVStore() {
     }
 }
 
-void KVStore::Put(uint64_t key, const std::string &val, bool to_cache) {
+void KVStore::Put(uint64_t key, const std::string& val, bool to_cache) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_); // 只有一个线程能写
 
     std::string cur_val = mem_table_->Get(key);
     if (!cur_val.empty()) {     // 如果存在这个key，替换value
         mem_table_->memory_ += strlen(val.c_str()) - strlen(cur_val.c_str());
-    } else {        // 如果不存在这个key，插入
+    }
+    else {        // 如果不存在这个key，插入
         mem_table_->memory_ += strlen(val.c_str()) + 1 + 12; // '\0' + (key + offset)
     }
 
@@ -96,7 +98,7 @@ void KVStore::Put(uint64_t key, const std::string &val, bool to_cache) {
 }
 
 // 将Put函数封装为任务，以便丢进线程池
-void KVStore::PutTask(uint64_t key, const std::string &val, bool to_cache) {
+void KVStore::PutTask(uint64_t key, const std::string& val, bool to_cache) {
     pool_.Enqueue(&KVStore::Put, this, key, val, to_cache);
 }
 
@@ -111,40 +113,39 @@ std::string KVStore::Get(uint64_t key) {
     if (!val.empty()) {
         if (val == options::kDelSign) {
             return "";
-        } else {
+        }
+        else {
             return val;
         }
     }
 
     // 3、查immutable_table_
     if (immutable_table_ != nullptr) {
-        // 增加引用计数，避免被析构
-        auto ptr = immutable_table_;
         val = immutable_table_->Get(key);
         if (!val.empty()) {
             if (val == options::kDelSign) {
                 return "";
-            } else {
+            }
+            else {
                 return val;
             }
         }
 
-        ptr.reset();
-
         while (kvstore_mode_ == compact) {
             std::unique_lock<std::mutex> lk(mutex_);
-            cond_var_.wait(lk, [&]{ return kvstore_mode_ == normal; });
+            cond_var_.wait(lk, [&] { return kvstore_mode_ == normal; });
         }
     }
 
     // 4、查SST文件   //TODO：不需要加互斥锁吗
-    for (const auto &table_list : sstable_meta_info_) {
-        for (const auto &table : table_list) {
+    for (const auto& table_list : sstable_meta_info_) {
+        for (const auto& table : table_list) {
             val = table.GetValue(key);
             if (!val.empty()) {
                 if (val == options::kDelSign) {
                     return "";
-                } else {
+                }
+                else {
                     return val;
                 }
             }
@@ -216,15 +217,16 @@ void KVStore::MinorCompaction() {
  * @param[in] minkey_sstindex 各个SST文件中的最小键及其所在的SST文件的索引
  * @param[in] index SST文件序号
  */
-static void Update(std::vector<std::map<int64_t, std::string>> &kv_to_compact,
-                                       std::vector<std::map<int64_t, std::string>::iterator> &kv_to_compact_iter,
-                                       std::map<int64_t, int> &minkey_sstindex, int index) {
+static void Update(std::vector<std::map<int64_t, std::string>>& kv_to_compact,
+    std::vector<std::map<int64_t, std::string>::iterator>& kv_to_compact_iter,
+    std::map<int64_t, int>& minkey_sstindex, int index) {
     while (kv_to_compact_iter[index] != kv_to_compact[index].end()) {
         int64_t key = kv_to_compact_iter[index]->first;
         if (minkey_sstindex.count(key) == 0) {
             minkey_sstindex[key] = index;
             break;
-        } else if (index > minkey_sstindex[key]) {
+        }
+        else if (index > minkey_sstindex[key]) {
             int temp_index = minkey_sstindex[key];
             minkey_sstindex[key] = index;
             Update(kv_to_compact, kv_to_compact_iter, minkey_sstindex, temp_index);
@@ -261,8 +263,8 @@ void KVStore::MajorCompaction(int level) {
     std::priority_queue<TableCache, std::vector<TableCache>, std::greater<>> sort_table_to_merge;
     // 需要合并的文件数
     int compact_num = (level - 1 == 0) ?
-                                               sst_num_for_levelminus1 :
-                                               (sst_num_for_levelminus1 - options::SSTMaxNumForLevel(level - 1));
+        sst_num_for_levelminus1 :
+        (sst_num_for_levelminus1 - options::SSTMaxNumForLevel(level - 1));
 
     // 遍历level - 1层中将被合并的SST文件，获取时间戳和最小最大key
     uint64_t time_stamp = 0;
@@ -281,7 +283,7 @@ void KVStore::MajorCompaction(int level) {
     }
 
     // 找到level层与level-1层的key有交集的文件
-    for (auto &table : sstable_meta_info_[level]) {
+    for (auto& table : sstable_meta_info_[level]) {
         if (table.GetMinKey() <= temp_max && table.GetMaxKey() >= temp_min) {
             sort_table_to_merge.emplace(table);
             file_to_rm_level.emplace_back(table);
@@ -307,7 +309,7 @@ void KVStore::MajorCompaction(int level) {
     kv_to_compact_iter.resize(kv_to_compact.size());
 
     // 获取每个SST文件中的最小key，如果key相同则保留时间戳最大的（通过倒序遍历来实现）
-    for (int i = kv_to_compact.size() - 1; i >=0; --i) {
+    for (int i = kv_to_compact.size() - 1; i >= 0; --i) {
         auto iter = kv_to_compact[i].begin();
         while (iter != kv_to_compact[i].end()) {
             if (minkey_sstindex.count(iter->first) == 0) {
@@ -356,11 +358,11 @@ void KVStore::MajorCompaction(int level) {
     }
 
     // 删除level-1和level层被合并的文件
-    for (auto &table : file_to_rm_levelminus1) {   // 没有修改level_num_vec_
+    for (auto& table : file_to_rm_levelminus1) {   // 没有修改level_num_vec_
         utils::RmFile(table.GetFileName().c_str());
         sstable_meta_info_[level - 1].erase(table);
     }
-    for (auto &table : file_to_rm_level) {
+    for (auto& table : file_to_rm_level) {
         utils::RmFile(table.GetFileName().c_str());
         sstable_meta_info_[level].erase(table);
     }
@@ -370,7 +372,7 @@ void KVStore::MajorCompaction(int level) {
 }
 
 void KVStore::WriteToFile(int level, uint64_t time_stamp, uint64_t num_pair,
-                                                      std::map<int64_t, std::string> &new_table) {
+    std::map<int64_t, std::string>& new_table) {
     std::string path = dir_ + "/level" + std::to_string(level);
     level_num_vec_[level]++;
     std::string file_name = path + "/SSTable" + std::to_string(level_num_vec_[level]) + ".sst";
@@ -382,16 +384,16 @@ void KVStore::WriteToFile(int level, uint64_t time_stamp, uint64_t num_pair,
     int64_t max_key = iter2->first;
 
     // 写入时间戳、键值对个数、最小键、最大键
-    out_file.write((char *)(&time_stamp), sizeof(uint64_t));
-    out_file.write((char *)(&num_pair), sizeof(uint64_t));
-    out_file.write((char *)(&min_key), sizeof(int64_t));
-    out_file.write((char *)(&max_key), sizeof(int64_t));
+    out_file.write((char*)(&time_stamp), sizeof(uint64_t));
+    out_file.write((char*)(&num_pair), sizeof(uint64_t));
+    out_file.write((char*)(&min_key), sizeof(int64_t));
+    out_file.write((char*)(&max_key), sizeof(int64_t));
 
     // 写入布隆过滤器
     std::bitset<81920> filter;
     int64_t temp_key;
-    const char *temp_value;
-    unsigned int hash[4] = {0};
+    const char* temp_value;
+    unsigned int hash[4] = { 0 };
     while (iter1 != new_table.end()) {
         temp_key = iter1->first;
         MurmurHash3_x64_128(&temp_key, sizeof(temp_key), 1, hash);
@@ -400,7 +402,7 @@ void KVStore::WriteToFile(int level, uint64_t time_stamp, uint64_t num_pair,
         }
         iter1++;
     }
-    out_file.write((char *)(&filter), sizeof(filter));
+    out_file.write((char*)(&filter), sizeof(filter));
 
     // 写入索引区
     const uint32_t val_start_area = 10272 + num_pair * 12; // 4 * 8  + 81920 / 8 + 索引区的长度
@@ -410,8 +412,8 @@ void KVStore::WriteToFile(int level, uint64_t time_stamp, uint64_t num_pair,
     while (iter1 != new_table.end()) {
         temp_key = iter1->first;
         index = val_start_area + offset;
-        out_file.write((char *)(&temp_key), sizeof(int64_t));
-        out_file.write((char *)(&index), sizeof(uint32_t));
+        out_file.write((char*)(&temp_key), sizeof(int64_t));
+        out_file.write((char*)(&index), sizeof(uint32_t));
         offset += strlen((iter1->second).c_str()) + 1;
         iter1++;
     }
