@@ -16,7 +16,7 @@ SkipList::~SkipList() {
     }
 
     // 重置成员变量
-    memory_ = 10272; // 时间戳+元素个数+最小最大key+布隆过滤器所占的字节数
+    memory_ = options::kInitialSize; // 时间戳+元素个数+最小最大key+布隆过滤器所占的字节数
     head_ = nullptr;
     size_ = 0;
     min_key_ = INT64_MAX;
@@ -117,7 +117,7 @@ void SkipList::Store(int num, const std::string &dir) {
     out_file.write((char *)(&filter), sizeof(filter));
 
     // 写入索引区
-    const uint32_t val_start_area = 10272 + size_ * 12; // 4 * 8  + 81920 / 8 + 索引区的长度
+    const uint32_t val_start_area = options::kInitialSize + size_ * 12; // 4 * 8  + 81920 / 8 + 索引区的长度
     uint32_t index = 0;
     node = GetFirstNode()->right_;
     int offset = 0;

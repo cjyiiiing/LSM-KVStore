@@ -71,7 +71,7 @@ public:
         if (pair.second) {  // 存在该key
             return pair.first->second;
         } else {        // 不存在该key
-            throw std::range_error{"No such key in the cache"};  // 当尝试存储超出范围的值时，会抛出该异常。
+            throw std::range_error{"No such key in the cache"};
         }
     }
 

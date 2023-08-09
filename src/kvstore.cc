@@ -34,8 +34,7 @@ KVStore::KVStore(const std::string& dir) : KVStoreAPI(dir), cache_(options::kCac
         // 填充level_num_vec_
         if (file_num > 0) {
             level_num_vec_.emplace_back(GetFileNum(files.back()));
-        }
-        else {
+        } else {
             level_num_vec_.emplace_back(0);
         }
         // 填充sstable_meta_info_
@@ -56,10 +55,12 @@ KVStore::KVStore(const std::string& dir) : KVStoreAPI(dir), cache_(options::kCac
 */
 KVStore::~KVStore() {
     std::unique_lock<std::mutex> lock(mutex_);
-    cond_var_.wait(lock, [&] { return kvstore_mode_ == normal; });
+    //cond_var_.wait(lock, [&] { return kvstore_mode_ == normal; });
+    cond_var_.wait(lock, [&] { return immutable_table_ == nullptr; });
     kvstore_mode_ = exits;
     std::string path = dir_ + "/level0";
     mem_table_->Store(++level_num_vec_[0], path);
+    lock.unlock();
     if (sstable_meta_info_[0].size() >= options::SSTMaxNumForLevel(0)) {
         MajorCompaction(1);
     }
@@ -71,8 +72,7 @@ void KVStore::Put(uint64_t key, const std::string& val, bool to_cache) {
     std::string cur_val = mem_table_->Get(key);
     if (!cur_val.empty()) {     // 如果存在这个key，替换value
         mem_table_->memory_ += strlen(val.c_str()) - strlen(cur_val.c_str());
-    }
-    else {        // 如果不存在这个key，插入
+    } else {        // 如果不存在这个key，插入
         mem_table_->memory_ += strlen(val.c_str()) + 1 + 12; // '\0' + (key + offset)
     }
 
@@ -113,8 +113,7 @@ std::string KVStore::Get(uint64_t key) {
     if (!val.empty()) {
         if (val == options::kDelSign) {
             return "";
-        }
-        else {
+        } else {
             return val;
         }
     }
@@ -125,8 +124,7 @@ std::string KVStore::Get(uint64_t key) {
         if (!val.empty()) {
             if (val == options::kDelSign) {
                 return "";
-            }
-            else {
+            } else {
                 return val;
             }
         }
@@ -137,15 +135,14 @@ std::string KVStore::Get(uint64_t key) {
         }
     }
 
-    // 4、查SST文件   //TODO：不需要加互斥锁吗
+    // 4、查SST文件
     for (const auto& table_list : sstable_meta_info_) {
         for (const auto& table : table_list) {
             val = table.GetValue(key);
             if (!val.empty()) {
                 if (val == options::kDelSign) {
                     return "";
-                }
-                else {
+                } else {
                     return val;
                 }
             }
@@ -225,8 +222,7 @@ static void Update(std::vector<std::map<int64_t, std::string>>& kv_to_compact,
         if (minkey_sstindex.count(key) == 0) {
             minkey_sstindex[key] = index;
             break;
-        }
-        else if (index > minkey_sstindex[key]) {
+        } else if (index > minkey_sstindex[key]) {
             int temp_index = minkey_sstindex[key];
             minkey_sstindex[key] = index;
             Update(kv_to_compact, kv_to_compact_iter, minkey_sstindex, temp_index);
@@ -405,7 +401,7 @@ void KVStore::WriteToFile(int level, uint64_t time_stamp, uint64_t num_pair,
     out_file.write((char*)(&filter), sizeof(filter));
 
     // 写入索引区
-    const uint32_t val_start_area = 10272 + num_pair * 12; // 4 * 8  + 81920 / 8 + 索引区的长度
+    const uint32_t val_start_area = options::kInitialSize + num_pair * 12; // 4 * 8  + 81920 / 8 + 索引区的长度
     uint32_t index = 0;
     iter1 = new_table.begin();
     int offset = 0;
