@@ -27,7 +27,9 @@ SSTable文件存储格式:
 进入项目所在目录：
 
 ```shell
-cmake .
+mkdir build
+cd build
+cmake ..
 make
 ./bin/test_kvstore ./data 10000  # ./data是存放SST文件的目录，10000是测试数据量
 ```
